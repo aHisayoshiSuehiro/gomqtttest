@@ -56,7 +56,7 @@ func NewTLSConfig() *tls.Config {
 	}
 
 	// Import client certificate/key pair
-	cert, err := tls.LoadX509KeyPair("samplecerts/akatsuka.crt", "samplecerts/akatsuka.key")
+	cert, err := tls.LoadX509KeyPair("email.crt", "email.key")
 	if err != nil {
 		panic(err)
 	}
@@ -112,7 +112,6 @@ func main() {
 
 	c.Subscribe("/status/akatsuka", 0, nil)
 	c.Subscribe("/connecting/all", 0, nil)
-	c.Subscribe("/go-mqtt/sample", 0, nil)
 	c.Subscribe("$SYS/broker/clients/connected", 0, nil)
 
 	i := 0
@@ -124,10 +123,8 @@ func main() {
 		c.Publish("/go-mqtt/sample", 0, false, text)
 		i++
 	}
-	text := fmt.Sprintf("{\"name\":\"%s\"}", clientID)
-	c.Publish("/connecting/all", 0, false, text)
 
-	time.Sleep(30 * time.Second)
+	time.Sleep(30000 * time.Second)
 
 	c.Disconnect(250)
 }
