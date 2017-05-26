@@ -1,0 +1,4 @@
+package: github.com/aHisayoshiSuehiro/gomqtttest
+import:
+- package: github.com/eclipse/paho.mqtt.golang
+  version: ^1.0.0
