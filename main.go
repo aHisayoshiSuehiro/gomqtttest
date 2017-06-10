@@ -12,27 +12,6 @@
  *    Mike Robertson
  */
 
-/*
-To run this sample, The following certificates
-must be created:
-  rootCA-crt.pem - root certificate authority that is used
-                   to sign and verify the client and server
-                   certificates.
-  rootCA-key.pem - keyfile for the rootCA.
-  server-crt.pem - server certificate signed by the CA.
-  server-key.pem - keyfile for the server certificate.
-  client-crt.pem - client certificate signed by the CA.
-  client-key.pem - keyfile for the client certificate.
-  CAfile.pem     - file containing concatenated CA certificates
-                   if there is more than 1 in the chain.
-                   (e.g. root CA -> intermediate CA -> server cert)
-  Instead of creating CAfile.pem, rootCA-crt.pem can be added
-  to the default openssl CA certificate bundle. To find the
-  default CA bundle used, check:
-  $GO_ROOT/src/pks/crypto/x509/root_unix.go
-  To use this CA bundle, just set tls.Config.RootCAs = nil.
-*/
-
 package main
 
 import (
@@ -41,6 +20,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"time"
+
+	config "github.com/aHisayoshiSuehiro/gomqtttest/config"
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
 )
@@ -97,12 +78,17 @@ var f MQTT.MessageHandler = func(client MQTT.Client, msg MQTT.Message) {
 
 func main() {
 	tlsconfig := NewTLSConfig()
+	conf, err := config.GetConfig()
+	if err != nil {
 
+	}
 	opts := MQTT.NewClientOptions()
 	opts.AddBroker("ssl://localhost:8883")
 	clientID := tlsconfig.Certificates[0].Leaf.Subject.CommonName
+	text := fmt.Sprintf("{\"name\":\"%s\"}", clientID)
 	opts.SetClientID(clientID).SetTLSConfig(tlsconfig)
 	opts.SetDefaultPublishHandler(f)
+	opts.SetWill(conf.DisconnectTopic, text, 1, false)
 
 	// Start the connection
 	c := MQTT.NewClient(opts)
@@ -111,11 +97,12 @@ func main() {
 	}
 
 	c.Subscribe("/status/akatsuka", 0, nil)
-	c.Subscribe("/connecting/all", 0, nil)
+	c.Subscribe(conf.ConnectTopic, 0, nil)
 	c.Subscribe("/go-mqtt/sample", 0, nil)
 	c.Subscribe("$SYS/broker/clients/connected", 0, nil)
 
 	i := 0
+	c.Publish(conf.ConnectTopic, 0, false, text)
 	for _ = range time.Tick(time.Duration(1) * time.Second) {
 		if i == 5 {
 			break
@@ -124,10 +111,9 @@ func main() {
 		c.Publish("/go-mqtt/sample", 0, false, text)
 		i++
 	}
-	text := fmt.Sprintf("{\"name\":\"%s\"}", clientID)
-	c.Publish("/connecting/all", 0, false, text)
 
-	time.Sleep(30 * time.Second)
+	time.Sleep(3 * time.Second)
 
+	c.Publish(conf.DisconnectTopic, 1, false, text)
 	c.Disconnect(250)
 }
