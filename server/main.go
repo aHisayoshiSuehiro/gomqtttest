@@ -12,36 +12,18 @@
  *    Mike Robertson
  */
 
-/*
-To run this sample, The following certificates
-must be created:
-  rootCA-crt.pem - root certificate authority that is used
-                   to sign and verify the client and server
-                   certificates.
-  rootCA-key.pem - keyfile for the rootCA.
-  server-crt.pem - server certificate signed by the CA.
-  server-key.pem - keyfile for the server certificate.
-  client-crt.pem - client certificate signed by the CA.
-  client-key.pem - keyfile for the client certificate.
-  CAfile.pem     - file containing concatenated CA certificates
-                   if there is more than 1 in the chain.
-                   (e.g. root CA -> intermediate CA -> server cert)
-  Instead of creating CAfile.pem, rootCA-crt.pem can be added
-  to the default openssl CA certificate bundle. To find the
-  default CA bundle used, check:
-  $GO_ROOT/src/pks/crypto/x509/root_unix.go
-  To use this CA bundle, just set tls.Config.RootCAs = nil.
-*/
-
 package main
 
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"time"
 
+	"github.com/aHisayoshiSuehiro/gomqtttest/config"
+	"github.com/aHisayoshiSuehiro/gomqtttest/server/node"
 	MQTT "github.com/eclipse/paho.mqtt.golang"
 )
 
@@ -95,8 +77,22 @@ var f MQTT.MessageHandler = func(client MQTT.Client, msg MQTT.Message) {
 	}()
 }
 
+func lisner(client MQTT.Client, msg MQTT.Message) {
+	go func() {
+		clientNode := node.Node{}
+		err := json.Unmarshal(msg.Payload(), &clientNode)
+		if err != nil {
+		}
+		fmt.Printf("%s: %s\n", msg.Topic(), clientNode.Name)
+	}()
+}
+
 func main() {
 	tlsconfig := NewTLSConfig()
+	conf, err := config.GetConfig()
+	if err != nil {
+
+	}
 
 	opts := MQTT.NewClientOptions()
 	opts.AddBroker("ssl://localhost:8883")
@@ -110,20 +106,10 @@ func main() {
 		panic(token.Error())
 	}
 
-	c.Subscribe("/status/akatsuka", 0, nil)
-	c.Subscribe("/connecting/all", 0, nil)
+	c.Subscribe("/go-mqtt/sample", 0, nil)
+	c.Subscribe(conf.ConnectTopic, 0, lisner)
+	c.Subscribe(conf.DisconnectTopic, 0, lisner)
 	c.Subscribe("$SYS/broker/clients/connected", 0, nil)
-
-	i := 0
-	for _ = range time.Tick(time.Duration(1) * time.Second) {
-		if i == 5 {
-			break
-		}
-		text := fmt.Sprintf("this is msg #%d!", i)
-		c.Publish("/go-mqtt/sample", 0, false, text)
-		i++
-	}
-
 	time.Sleep(30000 * time.Second)
 
 	c.Disconnect(250)
